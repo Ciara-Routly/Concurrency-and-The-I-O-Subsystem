@@ -1,0 +1,406 @@
+// Ciara Routly
+
+int BID, BADDR;
+int DADDR, D2ADDR;
+int T2ID, T2ADDR, T3ID, T3ADDR;
+
+int IORQ1[5], IORQ2[5], IORQ1B[5], IORQ2B[5];
+
+int BdevNum;
+int userID = 0;
+
+semaphore full;
+semaphore full2;
+semaphore fullDRIVER2;
+semaphore full3;
+semaphore full4;
+
+semaphore mutex;
+semaphore mutex2;
+semaphore mutex3;
+semaphore mutex4;
+semaphore mutexTWO;
+
+semaphore ioReq;
+
+semaphore reqPend;
+semaphore reqPendTWO;
+
+semaphore reqServ[5];
+
+semaphore phyIo;
+semaphore phyIoTWO;
+
+semaphore opComplete;
+semaphore opCompleteTWO;
+
+semaphore print;
+
+int counter = 0;
+
+
+void user(int userID){
+
+    int i;
+
+    int ID, ADDR, devNum;
+	
+    ID = userID;
+
+    ADDR = random(20);
+
+    devNum = random(2);	
+
+    for(i=0;i<5;i++){
+
+        p(full);
+
+        p(mutex);
+
+        BID = ID;
+
+        BADDR = ADDR;
+
+        BdevNum = devNum;
+
+        p(print);
+        cout << "User " << BID + 1 << " executes system call SIO or DOIO  " << endl;
+        v(print);
+		
+	v(mutex);
+
+        v(ioReq);
+
+        p(reqServ[ID]);
+    }
+}
+
+void DOIO(){ 
+
+int l = 0;
+int k = 0;
+int TID;
+int TADDR;
+int TdevNum;
+
+    int i;
+
+    for(i=0;i<25;i++){
+
+        p(ioReq);
+
+        p(mutex);
+
+        TID = BID;
+
+        TADDR = BADDR;
+
+        TdevNum = BdevNum;
+
+        v(mutex);
+
+        v(full);
+
+            if (TdevNum == 0){
+
+                p(full2);
+
+                p(mutex2);
+
+                IORQ1[k] = TID;
+
+                IORQ2[k] = TADDR;
+
+                k++;
+
+                if(k == 5) k = 0;
+
+                v(mutex2);
+
+                p(print);
+                cout << "DOIO assembles IORB and inserts it in IORQ for user "<< TID + 1 << endl;
+                v(print);
+
+                v(reqPend);
+        }
+
+            else {
+				
+                p(fullDRIVER2);
+
+                p(mutexTWO);
+
+                IORQ1B[l] = TID;
+
+                IORQ2B[l] = TADDR;
+
+                l++;
+
+                if(l == 5) l = 0;
+
+                v(mutexTWO);
+
+                p(print);
+                cout << "DOIO assembles IORB and inserts it in IORQ for user "<< TID + 1 << endl;
+                v(print);
+
+                v(reqPendTWO);
+            }
+    }
+}
+
+void deviceDriver(){
+
+int m = 0;
+
+while(counter < 25){
+
+    p(reqPend);
+
+        if (counter == 25){
+
+            v(reqPendTWO);
+	    v(phyIo);
+
+            break;
+        }
+
+    p(mutex2);
+
+    T2ID = IORQ1[m];
+
+    T2ADDR = IORQ2[m];
+
+    m++;
+
+    if(m == 5) m = 0;
+
+    v(mutex2);
+
+    v(full2);
+
+    p(full3);
+
+    p(mutex3);
+
+    DADDR = T2ADDR;
+
+    v(mutex3);
+
+    v(phyIo);
+
+    p(print);
+    cout << "Driver 1 initiates I/O operation for user " << BID + 1 << endl;
+    v(print);
+
+    p(opComplete);
+
+    v(reqServ[T2ID]);
+
+    counter++;
+
+        if (counter == 25){
+
+            v(reqPendTWO);
+
+            v(phyIo);
+
+            break;
+        }
+    }
+}
+
+void Driver2(){
+
+int m = 0;
+
+while(counter < 25){
+
+    p(reqPendTWO);
+
+        if (counter == 25){
+
+            v(reqPend);
+
+	    v(phyIoTWO);
+
+            break;
+        }       
+
+    p(mutexTWO);
+
+    T3ID = IORQ1B[m];
+
+    T3ADDR = IORQ2B[m];
+
+    m++;
+
+    if(m == 5) m = 0;
+
+    v(mutexTWO);
+
+    v(fullDRIVER2);
+	
+    p(full4);
+
+    p(mutex4);
+
+    D2ADDR = T3ADDR;
+
+    v(mutex4);
+	
+    v(phyIoTWO);
+
+    p(print);
+    cout << "Driver 2 initiates I/O operation for user " << BID + 1 << endl;
+    v(print);
+	
+    p(opCompleteTWO);
+
+    v(reqServ[T3ID]);
+
+    counter++;
+	
+        if(counter == 25){
+
+            v(reqPend);
+
+            v(phyIoTWO);
+
+            break;
+        }
+    }
+}
+
+
+void disk(){
+
+int seek = 0;
+        
+        int i;
+
+        while (counter < 25){
+
+	p(phyIo);
+
+        if (counter == 25){
+
+        break;
+}
+        p(mutex3);
+
+        seek = DADDR;
+
+        v(mutex3);
+
+        v(full3);
+
+        p(print); 
+        cout << "Disk 1 completes I/O operation (disk does not know what process initiated the I/O operation) " << endl;
+
+        cout << "Driver signal user " << BID + 1 << " (operation complete)" << endl;
+        v(print);
+
+        for(i=1;i<seek;i++){ 
+		
+	v(opComplete);
+}
+   }
+}
+
+
+void disk2(){
+
+int seek = 0;
+
+        int i;
+
+        while (counter < 25){
+
+        p(phyIoTWO);
+
+        if (counter == 25){
+        break;
+}
+        p(mutex4);
+
+        seek = DADDR;
+
+        v(mutex4);
+
+        v(full4);
+
+        p(print); 
+        cout << "Disk 2 completes I/O operation (disk does not know what process initiated the I/O operation) " << endl;
+
+        cout << "Driver signal user " << BID + 1 << " (operation complete)" << endl;
+        v(print);
+
+        for(i=1;i<seek;i++){
+
+	v(opCompleteTWO);
+}
+    }
+}
+
+
+main() {
+
+initialsem(full, 1);  
+initialsem(full2, 5);
+
+initialsem(fullDRIVER2, 5); 
+initialsem(full3, 1);
+
+initialsem(full4, 1);
+initialsem(mutex, 1);
+initialsem(mutex2, 1);
+initialsem(mutex3, 1);
+initialsem(mutexTWO, 1);
+
+initialsem(mutex4, 1);
+initialsem(ioReq, 0);
+
+initialsem(reqPend, 0);
+initialsem(reqPendTWO, 0);
+
+initialsem(reqServ[0], 0);
+initialsem(reqServ[1], 0);
+initialsem(reqServ[2], 0);
+initialsem(reqServ[3], 0);
+initialsem(reqServ[4], 0);
+
+initialsem(phyIo, 0);
+initialsem(phyIoTWO, 0);
+
+initialsem(opComplete, 1);
+initialsem(opCompleteTWO, 1);
+
+initialsem(print, 1);
+
+
+cobegin {
+
+user(0);
+
+user(1);
+
+user(2);
+
+user(3);
+
+user(4);
+
+DOIO();
+
+deviceDriver();
+
+Driver2();
+
+disk();
+
+disk2();
+
+}
+
+}
